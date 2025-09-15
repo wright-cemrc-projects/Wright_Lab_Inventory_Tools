@@ -6,6 +6,8 @@ Python project for connecting inventories and updating.
 
 These python scripts integrate with Google Drive sheets (.xlsx) via a Google Drive API.
 
+![Main Menu View](images/Main_Menu.png)
+
 ## Installation and Setup Notes
 
 This was initially written with Python 3.10.
