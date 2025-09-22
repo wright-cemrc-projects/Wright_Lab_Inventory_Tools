@@ -17,7 +17,8 @@ from window_helper import ToplevelWindowHelper
 import tkinter as tk
 from tkinter import messagebox
 import sys
-import time
+import re
+from datetime import date, datetime
 
 class DriveManager:
     """
@@ -140,43 +141,189 @@ class DriveManager:
             else:
                 return False, f"HTTP_ERROR: {e}"  # Other errors
 
-    def upload_file(self, file_id, file_path):
-        """
-        Upload (update) a local file to an existing file on Google Drive.
 
-        :param file_id: The Google Drive file ID of the file to update.
-        :param file_path: Local path of the file to upload.
-        :return: (True, None) on success, or (False, error_message) on failure.
+    def upload_file(self, file_path, file_id=None, parent_id=None):
         """
+        Upload a file to Google Drive.
+        - If file_id is provided, updates the existing file.
+        - If file_id is None, creates a new file. If parent_id is given,
+        uploads into that folder; otherwise uploads to My Drive.
 
-        # Return error if no file_id is present
-        if not file_id:
-            return False, "MISSING_ID"
+        :param file_path (str): Local path of the file to upload.
+        :param file_id (str): (Optional) Google Drive file ID of an existing file.
+        :param parent_id (str): (Optional) Google Drive folder ID to upload into if creating new.
+        :return (tuple): 
+            (True, file_id) on success
+            (False, error_message) on failure.
+        """
 
         try:
-            # Create a media upload object for the file
+            # Create a media upload object for the file to allow Google Drive API to read and upload
             media = MediaFileUpload(
                 file_path,
-                mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+                mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                 resumable=True
             )
 
-            print(f"⏳ Uploading {file_path} to Google Drive... please wait.")
+            if file_id:
+                # Case 1: Update an existing file if a file_id is given
+                print(f"⏳ Updating {file_path} on Google Drive... please wait.")
+                # Use the Drive API 'update' method to overwrite existing file content
+                self.service.files().update(fileId=file_id, media_body=media).execute()
+                print(f"✅ File updated on Google Drive (ID: {file_id})")
+                return True, file_id
 
-            # Update the existing Drive file with the new content
-            self.service.files().update(fileId=file_id, media_body=media).execute()
+            else:
+                # Case 2: Creating a new file if no file_id given
+                file_metadata = {
+                    # Set the Drive filename same as local filename
+                    "name": os.path.basename(file_path)
+                }
 
-            print(f"✅ File updated on Google Drive (ID: {file_id})")
-            return True, None
-        
-        # Handle Google Drive API errors by status code
+                if parent_id:
+                    # If a parent folder ID is provided, place the file inside that folder
+                    file_metadata["parents"] = [parent_id]
+
+                print(f"⏳ Uploading new file {file_path} to Google Drive... please wait.")
+                # Use the Drive API 'create' method to create a new file with the metadata and content
+                new_file = self.service.files().create(
+                    body=file_metadata,
+                    media_body=media,
+                    fields="id"
+                ).execute()
+
+                # Extract the Drive file ID
+                new_file_id = new_file.get("id")
+                print(f"✅ File uploaded to Google Drive (ID: {new_file_id})")
+                return True, new_file_id
+
         except HttpError as e:
             if e.resp.status == 404:
-                return False, "NOT_FOUND"  # File does not exist
+                return False, "NOT_FOUND"
             elif e.resp.status == 403:
-                return False, "PERMISSION_DENIED"  # User does not have permission
+                return False, "PERMISSION_DENIED"
             else:
-                return False, f"HTTP_ERROR: {e}"  # Other errors
+                return False, f"HTTP_ERROR: {e}"
+
+        except Exception as e:
+            return False, f"ERROR: {e}"
+
+    def get_archive_dates(self, folder_id):
+        """
+        Retrieve all archived folder dates from a given parent folder in Google Drive.
+
+        Looks for subfolders whose names end with a date in teh format MM_DD_YYYY, 
+        turns those dates into datetime objects, and returns them as a list.
+
+        :param folder_id (str): The Google Drive ID of the folder to search.
+        :return dates (list): A list of the folders dates as datetime objects
+        """
+
+        # Query to list only folders inside that parent folder
+        query = f"'{folder_id}' in parents and mimeType = 'application/vnd.google-apps.folder' and trashed = false"
+
+        # Execute the API call to list folders
+        results = self.service.files().list(
+            q=query,
+            fields="files(id, name)"
+        ).execute()
+
+        folders = results.get("files", [])
+
+        # Regex pattern: Search for MM_DD_YYYY at the end of the string
+        pattern = re.compile(r"(\d{2}_\d{2}_\d{4})$")
+
+        dates = []
+        for folder in folders:
+            # Extract date from folder name if it matches the pattern
+            match = pattern.search(folder["name"])
+            if match:
+                date_str = match.group(1)  # e.g., "07_15_2023"
+                # Convert to datetime object if you want
+                date_obj = datetime.strptime(date_str, "%m_%d_%Y")
+                dates.append(date_obj)
+
+        print("Extracted archive dates:", dates)
+
+        return dates
+    
+    def make_archive_copies(self):
+        """
+        Create a new archive folder in Google Drive containing a copy of all the current inventory files.
+
+        This method:
+        1. Creates a new folder named "Archive_MM_DD_YYYY" under the main Inventories folder.
+        2. Downloads all current inventory files locally.
+        3. Uploads each file into the newly created archive folder.
+        4. Marks temporary local copies for deletion.
+        """
+
+        # Current date formatted as MM_DD_YYYY
+        curr_date = date.today().strftime("%m_%d_%Y")
+
+        # Metadata for new archive folder
+        file_metadata = {
+            "name": f"Archive_{curr_date}",
+            "mimeType": "application/vnd.google-apps.folder",
+            # Gets the location in Google Drive to place the new folder
+            "parents": [app_context.id_manager.get_id("Inventories_Folder")]
+        }
+
+        # Create the new archive folder in Drive
+        folder = self.service.files().create(body=file_metadata, fields="id").execute()
+        # Get the Drive ID of the new folder
+        new_folder_id = folder.get("id")
+    
+        # Loop through all registered inventory files
+        for name, file_id in app_context.id_manager.get_all_ids().items():
+            # Skip the main folder ID
+            if name == "Inventories_Folder":
+                continue
+            # Create the file name
+            curr_path = f"{name}_{curr_date}.xlsx"
+            self.download_file(file_id, curr_path)
+            # Mark the downloaded file for deletion on program close
+            app_context.temp_file_manager.mark_for_deletion(curr_path)
+            # Upload file into the new archive folder
+            self.upload_file(file_path=curr_path, parent_id=new_folder_id)
+            
+    def auto_archive(self):
+        """
+        Automatically create a new archive if no archive exists for the current half-year period.
+
+        Logic:
+        1. Determines the current half-year:
+        - 1 = January to June
+        - 2 = July to December
+        2. Retrieves all existing archive folder dates from the main Inventories folder.
+        3. Checks if any existing archive falls in the same year and half-year as today.
+        4. If no archive exists for the current half, calls make_archive_copies() to create one.
+        5. Otherwise, no archive is made.
+        """
+
+        # Current date
+        current_date = date.today()
+        # Fetch existing archive folder dates
+        archive_dates = self.get_archive_dates(app_context.id_manager.get_id("Inventories_Folder"))
+
+        # Check if any existing archive is in the same year and half
+        given_half = 1 if current_date.month <= 6 else 2
+        given_year = current_date.year
+
+        # Check if any other date is in the same year and half
+        same_half_exists = any(
+            (d.year == given_year) and
+            ((1 if d.month <= 6 else 2) == given_half)
+            for d in archive_dates
+        )
+     
+        if not same_half_exists:
+            # If there is no current archive folder for the half-year, create a new one
+            self.make_archive_copies()
+            print(f"Created archive copy for {current_date}.")
+        else:
+            # If there is a current archive folder for the half-year, do nothing
+            return
             
 class ExcelHelper:
     """

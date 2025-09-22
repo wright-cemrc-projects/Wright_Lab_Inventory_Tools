@@ -4,7 +4,7 @@ from console_helper import ConsoleFooter, ConsoleRedirector
 import app_context
 from inventory_helper import GridDewarManager, Freezer20Manager, CellDewarManager, Freezer80Manager
 from atexit_helper import TempFileManager
-from data_helper import IDManager, ExcelHelper
+from data_helper import IDManager, ExcelHelper, DriveManager
 import atexit
 
 # -------------------------------------------------------------------
@@ -17,13 +17,16 @@ sys.stdout = app_context.console_redirector
 sys.stderr = app_context.console_redirector
 
 # Initialize managers for global app state
-id_manager = IDManager()  # Handles Google Drive file IDs
-temp_file_manager = TempFileManager()  # Manages temporary files
-app_context.temp_file_manager = temp_file_manager  # Make temp_file_manager globally accesible
-excel_manager = ExcelHelper() # Manages file actions
+app_context.id_manager = IDManager()  # Handles Google Drive file IDs
+app_context.temp_file_manager = TempFileManager()  # Handles temporary files
+
+# Manages file actions
+excel_manager = ExcelHelper()
+# Manage drive actions
+drive_manager = DriveManager()
 
 # Register cleanup at exit for temporary files
-atexit.register(temp_file_manager.cleanup_temp_files)
+atexit.register(app_context.temp_file_manager.cleanup_temp_files)
 
 # -------------------------------------------------------------------
 # ROOT WINDOW CONFIGURATION
@@ -60,7 +63,7 @@ console.grid(row=1, column=0, sticky="ew")
 def on_closing():
     """Cleanup temp files and fully exit when root window is closed"""
 
-    temp_file_manager.cleanup_temp_files()
+    app_context.temp_file_manager.cleanup_temp_files()
     root.destroy()
     sys.exit()
 
@@ -82,7 +85,27 @@ help_button = tk.Button(
     width=3,
     relief="raised",
     command=click_Help)
-help_button.grid(row=0, column=0, sticky="ne", padx=10, pady=(10, 0))
+help_button.grid(row=0, column=1, sticky="ne", padx=10, pady=(10, 0))
+
+# -------------------------------------------------------------------
+# Archive BUTTON
+# -------------------------------------------------------------------
+
+def click_Archive():
+    """Creates a archive folder in Google Drive of the current version of all inventory files"""
+
+    drive_manager.make_archive_copies()
+
+# Create Archive button left of Help button
+about_button = tk.Button(
+    main_frame,
+    text="Archive",
+    font=("Arial", 12, "bold"),
+    width=6,
+    relief="raised",
+    command=click_Archive
+)
+about_button.grid(row=0, column=0, sticky="ne", padx=(5, 10), pady=(10, 0))
 
 # -------------------------------------------------------------------
 # HEADER
@@ -102,25 +125,25 @@ label.grid(row=1, column=0, pady=(0, 10), padx=20, sticky="n")
 def click_Grid():
     """Open the main menu for the Grid Dewar inventory."""
 
-    grid_dewar_manager = GridDewarManager(root, id_manager=id_manager)
+    grid_dewar_manager = GridDewarManager(root)
     grid_dewar_manager.open_main_menu()
 
 def click_80():
     """Open the main menu for the -80°C Freezer inventory."""
 
-    freezer80_manager = Freezer80Manager(root, id_manager=id_manager)
+    freezer80_manager = Freezer80Manager(root)
     freezer80_manager.open_main_menu()
 
 def click_20():
     """Open the main menu for the -20°C Freezer inventory."""
 
-    freezer20_manager = Freezer20Manager(root, id_manager=id_manager)
+    freezer20_manager = Freezer20Manager(root)
     freezer20_manager.open_main_menu()
 
 def click_Cell():
     """Open the main menu for the Cell Dewar inventory."""
     
-    cell_manager = CellDewarManager(root, id_manager=id_manager)
+    cell_manager = CellDewarManager(root)
     cell_manager.open_main_menu()
 
 # Define buttons (label + callback) in a list for clean iteration

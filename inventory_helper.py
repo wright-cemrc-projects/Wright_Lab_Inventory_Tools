@@ -44,8 +44,6 @@ class InventoryManagerBase:
         Local file path to the row inventory Excel file.    
     grid_path (str, optional): Default = None
         Local file path to the grid inventory Excel file (if applicable).    
-    id_manager (object, optional): Default = None
-        Manager responsible for handling Google Drive file IDs.
 
     Attributes
     ----------
@@ -55,8 +53,6 @@ class InventoryManagerBase:
         Path to the local copy of the row inventory file.  
     grid_path (str):  
         Path to the local copy of the grid inventory file.  
-    id_manager (object):  
-        Manages Google Drive file ID lookups/updates.  
     row_ID (str):  
         Google Drive file ID for the row inventory.  
     grid_ID (str):  
@@ -132,13 +128,12 @@ class InventoryManagerBase:
         Return columns to hide in the GUI.  
     """
 
-    def __init__(self, parent, row_path=None, grid_path=None, id_manager=None):
+    def __init__(self, parent, row_path=None, grid_path=None):
         """Initialize the Inventory Manager. See class docstring for parameter/attribute details."""
 
         self.parent = parent
         self.row_path = row_path
         self.grid_path = grid_path
-        self.id_manager = id_manager
         self.row_ID = None
         self.grid_ID = None
         self.row_id_key = None
@@ -182,9 +177,12 @@ class InventoryManagerBase:
 
         # --- Date column ---
         if date_col and date_col in df_cleaned.columns:
+            # Try converting values to datetime to capture dates with invalid format (invalid entries become NaT)
             series = pd.to_datetime(df_cleaned[date_col], errors="coerce", dayfirst=False)
-            # Keep original values if conversion failed
-            df_cleaned[date_col] = series.dt.strftime("%m/%d/%Y").where(series.notna(), df_cleaned[date_col].astype(str))
+            # Format the dates as MM/DD/YYYY (invalid become NaN)
+            df_cleaned[date_col] = series.dt.strftime("%m/%d/%Y")
+            # Format invalid into empty string ""
+            df_cleaned[date_col] = df_cleaned[date_col].fillna("")
 
         # --- 4 All other columns (string/text) ---
         for col in other_cols:
@@ -209,7 +207,7 @@ class InventoryManagerBase:
         # Handle different error cases from DriveManager
         if error == "MISSING_ID" or error == "NOT_FOUND":
             # Prompt user to update ID if file is missing
-            self.id_manager.change_id_window(self.parent, id_key)
+            app_context.id_manager.change_id_window(self.parent, id_key)
         elif error == "PERMISSION_DENIED":
             # User doesn’t have Drive access to this file
             messagebox.showerror("Permission Denied", "You don't have access to this file.")
@@ -230,6 +228,7 @@ class InventoryManagerBase:
         """
 
         self.drive_tool = DriveManager()
+        self.drive_tool.auto_archive()
 
         # --- Step 1: Download and load row data ---
         if not (self.row_id_key == None):
@@ -387,7 +386,7 @@ class InventoryManagerBase:
         self.update_grid_inventory()
 
         # Upload the updated row file to Google Drive
-        success, error = self.drive_tool.upload_file(self.row_ID, self.row_path)
+        success, error = self.drive_tool.upload_file(file_path=self.row_path, file_id=self.row_ID)
 
         # If upload fails, handle the error gracefully
         if not success:
@@ -395,7 +394,7 @@ class InventoryManagerBase:
         
         if self.grid_ID != self.row_ID:
             # Upload the updated grid file to Google Drive if different from row file
-            success, error = self.drive_tool.upload_file(self.grid_ID, self.grid_path)
+            success, error = self.drive_tool.upload_file(file_path=self.grid_path, file_id=self.grid_ID)
 
             # If upload fails, handle the error gracefully
             if not success:
@@ -422,7 +421,7 @@ class InventoryManagerBase:
         self.update_grid_inventory()
 
                 # Upload the updated row file to Google Drive
-        success, error = self.drive_tool.upload_file(self.row_ID, self.row_path)
+        success, error = self.drive_tool.upload_file(file_path=self.row_path, file_id=self.row_ID)
 
         # If upload fails, handle the error gracefully
         if not success:
@@ -430,7 +429,7 @@ class InventoryManagerBase:
         
         if self.grid_ID != self.row_ID:
             # Upload the updated grid file to Google Drive if different from row file
-            success, error = self.drive_tool.upload_file(self.grid_ID, self.grid_path)
+            success, error = self.drive_tool.upload_file(file_path=self.grid_path, file_id=self.grid_ID)
 
             # If upload fails, handle the error gracefully
             if not success:
@@ -672,8 +671,6 @@ class GridDewarManager(InventoryManagerBase):
     ----------
     root (tk.Widget):
         The Tkinter root window or parent widget.
-    id_manager (IDManager):
-        An object responsible for managing unique file IDs for Google Drive synchronization.
 
     Attributes
     ----------
@@ -725,21 +722,20 @@ class GridDewarManager(InventoryManagerBase):
         Return the name of the 'Remove Entry' window.
     """
 
-    def __init__(self, root, id_manager):
+    def __init__(self, root):
         """Initializes the GridDewarManager. See class docstring for parameter/attribute details."""
 
         # Initialize logic from the InventoryManagerBase using the given row_path
         super().__init__(root, 
-            row_path="Grid_Dewar.xlsx", 
-            grid_path=None, 
-            id_manager=id_manager
+            row_path="Grid_Dewar_Inventory.xlsx", 
+            grid_path=None
             )
         # Key for row inventory lookup in the ID manager
-        self.row_id_key = "grid_dewar"
+        self.row_id_key = "Grid_Dewar_Inventory"
         # Grid is not used for Grid Dewar, so this remains None
         self.grid_id_key = None
         # Get the unique ID for the row file from the ID manager
-        self.row_ID = self.id_manager.get_id(self.row_id_key)
+        self.row_ID = app_context.id_manager.get_id(self.row_id_key)
         # No grid file is managed here, so leave None
         self.grid_ID=None
 
@@ -751,7 +747,7 @@ class GridDewarManager(InventoryManagerBase):
     def get_row_sheet_name(self):
         """Return the name of the Excel sheet used for row-based inventory."""
 
-        return "Box_Name_By_Category_Original"
+        return "Details"
 
     def get_sort_columns(self):
         """Return the list of columns used for sorting the grid dewar inventory in sorting order."""
@@ -851,8 +847,6 @@ class Freezer80Manager(InventoryManagerBase):
     ----------
     root (tk.Widget):
         The Tkinter root window or parent widget.
-    id_manager (IDManager):
-        An object responsible for managing unique file IDs for Google Drive synchronization.
 
     Attributes
     ----------
@@ -909,24 +903,23 @@ class Freezer80Manager(InventoryManagerBase):
         creating a legend, saving the workbook, and uploading it to Google Drive.
     """
 
-    def __init__(self, root, id_manager):
+    def __init__(self, root):
         """Initializes the Freezer80Manager. See class docstring for parameter/attribute details."""
 
         # Initialize logic from the InventoryManagerBase using the given row_path and grid_path
         super().__init__(
             root,
-            row_path="Freezer80.xlsx",
-            grid_path="Freezer80.xlsx", 
-            id_manager=id_manager
+            row_path="-80_Inventory.xlsx",
+            grid_path="-80_Inventory.xlsx"
         )
         # Key for row inventory lookup in the ID manager
-        self.row_id_key = "freezer80"
+        self.row_id_key = "-80_Inventory"
         # Key for grid inventory lookup in the ID manager
-        self.grid_id_key = "freezer80"
+        self.grid_id_key = "-80_Inventory"
         # Get the unique ID for the row file from the ID manager
-        self.row_ID = self.id_manager.get_id(self.row_id_key)
+        self.row_ID = app_context.id_manager.get_id(self.row_id_key)
         # Get the unique ID for the grid file from the ID manager
-        self.grid_ID = self.id_manager.get_id(self.grid_id_key)
+        self.grid_ID = app_context.id_manager.get_id(self.grid_id_key)
 
     def get_window_title(self):
         """Return the title for the main window."""
@@ -1252,8 +1245,6 @@ class Freezer20Manager(InventoryManagerBase):
     ----------
     root (tk.Widget):
         The Tkinter root window or parent widget.
-    id_manager (IDManager):
-        An object responsible for managing unique file IDs for Google Drive synchronization.
 
     Attributes
     ----------
@@ -1308,24 +1299,23 @@ class Freezer20Manager(InventoryManagerBase):
         creating a legend, saving the workbook, and uploading it to Google Drive.
     """
             
-    def __init__(self, root, id_manager):
+    def __init__(self, root):
         """Initializes the Freezer20Manager. See class docstring for parameter/attribute details."""
         
         # Initialize logic from the InventoryManagerBase using the given row_path and grid_path
         super().__init__(
             root,
-            row_path="Freezer20.xlsx",
-            grid_path="Freezer20.xlsx", 
-            id_manager=id_manager
+            row_path="-20_Inventory.xlsx",
+            grid_path="-20_Inventory.xlsx"
         )
         # Key for row inventory lookup in the ID manager
-        self.row_id_key = "freezer20"
+        self.row_id_key = "-20_Inventory"
         # Key for grid inventory lookup in the ID manager
-        self.grid_id_key = "freezer20"
+        self.grid_id_key = "-20_Inventory"
         # Get the unique ID for the row file from the ID manager
-        self.row_ID = self.id_manager.get_id(self.row_id_key)
+        self.row_ID = app_context.id_manager.get_id(self.row_id_key)
         # Get the unique ID for the grid file from the ID manager
-        self.grid_ID = self.id_manager.get_id(self.grid_id_key)
+        self.grid_ID = app_context.id_manager.get_id(self.grid_id_key)
 
     def get_window_title(self):
         """Return the title for the main window."""
@@ -1644,8 +1634,6 @@ class CellDewarManager(InventoryManagerBase):
     ----------
     root (tk.Widget): 
         The Tkinter root window or parent widget.
-    id_manager (IDManager):
-        An object responsible for managing unique file IDs for Google Drive synchronization.
 
     Attributes
     ----------
@@ -1700,24 +1688,23 @@ class CellDewarManager(InventoryManagerBase):
         Update the Excel grid layout for cell dewar inventory.
     """
 
-    def __init__(self, root, id_manager):
+    def __init__(self, root):
         """Initializes the Freezer80Manager. See class docstring for parameter/attribute details."""
 
         # Initialize logic from the InventoryManagerBase using the given row_path and grid_path
         super().__init__(
             root,
-            row_path="Cell_Rows.xlsx",
-            grid_path="Cell_Grid.xlsx",
-            id_manager=id_manager
+            row_path="Cell_Culture_Inventory_Rows.xlsx",
+            grid_path="Cell_Culture_Inventory_Grid.xlsx"
         )
         # Key for row inventory lookup in the ID manager
-        self.row_id_key = "cell_culture_rows"
+        self.row_id_key = "Cell_Culture_Inventory_Rows"
         # Key for grid inventory lookup in the ID manager
-        self.grid_id_key = "cell_culture_grid"
+        self.grid_id_key = "Cell_Culture_Inventory_Grid"
         # Get the unique ID for the row file from the ID manager
-        self.row_ID = self.id_manager.get_id(self.row_id_key)
+        self.row_ID = app_context.id_manager.get_id(self.row_id_key)
         # Get the unique ID for the grid file from the ID manager
-        self.grid_ID = self.id_manager.get_id(self.grid_id_key)
+        self.grid_ID = app_context.id_manager.get_id(self.grid_id_key)
 
     def get_window_title(self):
         """Return the title for the main window."""
@@ -1732,7 +1719,7 @@ class CellDewarManager(InventoryManagerBase):
     def get_sort_columns(self):
         """Return the list of columns used for sorting the grid dewar inventory in sorting order."""
 
-        return ["Rack Number", "Box Number", "Vial Location"]
+        return ["Rack Number", "Box Number", "Vial Position"]
 
     def get_for_filled(self):
         """
@@ -1746,7 +1733,7 @@ class CellDewarManager(InventoryManagerBase):
     def get_location_column(self):
         """Return the column representing the physical location of an individual unit of inventory."""
 
-        return "Vial Location"
+        return "Vial Position"
 
     def get_int_fields(self):
         """Return the fields that should be strictly treated as integers."""
@@ -1756,7 +1743,7 @@ class CellDewarManager(InventoryManagerBase):
     def get_remove_fields(self):
         """Return the fields required to identify and remove an entry."""
 
-        return ["Rack Number", "Box Number", "Vial Location"]
+        return ["Rack Number", "Box Number", "Vial Position"]
 
     def get_label_column(self):
         """Return the column name used as a label for an individual inventory entry."""
@@ -1766,7 +1753,7 @@ class CellDewarManager(InventoryManagerBase):
     def get_letter_nums(self):
         """Return the fields that conatin a letter followed by a number (Ex: A4)"""
 
-        return ["Vial Location", "Passage Number"]
+        return ["Vial Position", "Passage Number"]
 
     def get_date_column(self):
         """Return the column that stores date information."""
@@ -1781,7 +1768,7 @@ class CellDewarManager(InventoryManagerBase):
     def get_required_add_fields(self):
         """Return the fields required to be enetered by the user when adding a new entry."""
 
-        return ["Rack Number", "Box Number", "Vial Location", "Vial Label", "Cell Type", "Passage Number", "Date Frozen", "Person/Initials"]
+        return ["Rack Number", "Box Number", "Vial Position", "Vial Label", "Cell Type", "Passage Number", "Date Frozen", "Person/Initials"]
 
     def get_add_top_label(self):
         """Return the label shown at the top of the 'Add Entry' window."""
@@ -1796,7 +1783,7 @@ class CellDewarManager(InventoryManagerBase):
     def get_required_remove_fields(self):
         """Return the fields to be enterd by the user required when removing an entry."""
 
-        return ["Rack Number", "Box Number", "Vial Location"]
+        return ["Rack Number", "Box Number", "Vial Position"]
 
     def get_remove_top_label(self):
         """Return the label shown at the top of the 'Remove Entry' window."""
@@ -1867,7 +1854,7 @@ class CellDewarManager(InventoryManagerBase):
 
             # Convert float box numbers to integers, otherwise just strip string
             box = str(int(row['Box Number'])) if isinstance(row['Box Number'], float) else str(row['Box Number']).strip()
-            position = str(row['Vial Location']).strip().upper()
+            position = str(row['Vial Position']).strip().upper()
             label = str(row['Vial Label']).strip()
 
             # Force datetime into string if needed
