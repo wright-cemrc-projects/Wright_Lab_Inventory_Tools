@@ -3,6 +3,8 @@ name: Build Wright Lab Inventory Executables
 on:
   push:
     branches: [ main ]   # Run on pushes to main branch
+    tags:
+      - 'v*'   # run workflow when you push version tags
   pull_request:
     branches: [ main ]   # Run on PRs into main
   workflow_dispatch:      # Allow manual runs
