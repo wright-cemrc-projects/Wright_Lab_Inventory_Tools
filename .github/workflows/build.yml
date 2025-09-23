@@ -1,0 +1,87 @@
+name: Build Wright Lab Inventory Executables
+
+on:
+  push:
+    branches: [ main ]   # Run on pushes to main branch
+  pull_request:
+    branches: [ main ]   # Run on PRs into main
+  workflow_dispatch:      # Allow manual runs
+
+jobs:
+  build:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [windows-latest, macos-latest]
+
+    steps:
+      # -----------------------------
+      # 1. Check out repository code
+      # -----------------------------
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      # -----------------------------
+      # 2. Set up Python
+      # -----------------------------
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      # -----------------------------
+      # 3. Install dependencies
+      # -----------------------------
+      - name: Install requirements + pyinstaller
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pyinstaller
+
+      # -----------------------------
+      # 4. Build executables
+      # -----------------------------
+      - name: Build with spec file
+        run: |
+          pyinstaller Wright_Lab_Inventory.spec
+
+      # -----------------------------
+      # 5. Upload built executables
+      # -----------------------------
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: Wright_Lab_Inventory-${{ matrix.os }}
+          path: dist/Wright_Lab_Inventory/**
+
+  release:
+    needs: build   # wait until build finishes
+    runs-on: ubuntu-latest
+
+    steps:
+      # -----------------------------
+      # 1. Download build artifacts
+      # -----------------------------
+      - name: Download Windows build
+        uses: actions/download-artifact@v4
+        with:
+          name: Wright_Lab_Inventory-windows-latest
+          path: dist/windows
+
+      - name: Download macOS build
+        uses: actions/download-artifact@v4
+        with:
+          name: Wright_Lab_Inventory-macos-latest
+          path: dist/macos
+
+      # -----------------------------
+      # 2. Create GitHub Release
+      # -----------------------------
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            dist/windows/**
+            dist/macos/**
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
