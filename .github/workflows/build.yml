@@ -3,11 +3,12 @@ name: Build Wright Lab Inventory Executables
 on:
   push:
     branches: [ main ]   # Run on pushes to main branch
-    tags:
-      - 'v*'   # run workflow when you push version tags
   pull_request:
     branches: [ main ]   # Run on PRs into main
   workflow_dispatch:      # Allow manual runs
+
+permissions:
+  contents: write   # Required so workflow can push tags/releases
 
 jobs:
   build:
@@ -61,6 +62,10 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      - name: Checkout repo (with history so we can tag)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # ✅ needed so we can create tags properly
       # -----------------------------
       # 1. Create a new tag automatically with datetime
       # -----------------------------
@@ -86,7 +91,6 @@ jobs:
       - name: Download macOS build
         uses: actions/download-artifact@v4
         with:
-          tag_name: ${{ env.TAG }}
           name: Wright_Lab_Inventory-macos-latest
           path: dist/macos
 
@@ -96,6 +100,8 @@ jobs:
       - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
+          tag_name: ${{ env.TAG }}
+          name: "Release ${{ env.TAG }}"
           files: |
             dist/windows/**
             dist/macos/**
