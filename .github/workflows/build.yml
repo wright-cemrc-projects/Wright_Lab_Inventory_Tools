@@ -62,7 +62,20 @@ jobs:
 
     steps:
       # -----------------------------
-      # 1. Download build artifacts
+      # 1. Create a new tag automatically with datetime
+      # -----------------------------
+      - name: Create Tag
+        id: create_tag
+        run: |
+          TAG="v$(date +'%Y-%m-%d-%H%M%S')"
+          echo "TAG=$TAG" >> $GITHUB_ENV
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git tag $TAG
+          git push origin $TAG
+
+      # -----------------------------
+      # 2. Download build artifacts
       # -----------------------------
       - name: Download Windows build
         uses: actions/download-artifact@v4
@@ -73,11 +86,12 @@ jobs:
       - name: Download macOS build
         uses: actions/download-artifact@v4
         with:
+          tag_name: ${{ env.TAG }}
           name: Wright_Lab_Inventory-macos-latest
           path: dist/macos
 
       # -----------------------------
-      # 2. Create GitHub Release
+      # 3. Create GitHub Release
       # -----------------------------
       - name: Create Release
         uses: softprops/action-gh-release@v2
