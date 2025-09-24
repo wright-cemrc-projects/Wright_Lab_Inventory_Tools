@@ -15,12 +15,12 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-      - os: windows-latest
-        label: win-x64
-      - os: macos-13
-        label: macos-x64
-      - os: macos-14
-        label: macos-arm64
+        - os: windows-latest
+          label: win-x64
+        - os: macos-13
+          label: macos-x64
+        - os: macos-14
+          label: macos-arm64
 
     steps:
       # -----------------------------
