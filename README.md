@@ -22,3 +22,6 @@ Before you can use these scripts, you will need to generate a 'credentials.json'
 
 ## Licensing info
 To be added.
+
+## Branch for testing temporary directory
+Goal: to have excel files saved in a safe location.
