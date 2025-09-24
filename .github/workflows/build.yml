@@ -15,7 +15,12 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        os: [windows-latest, macos-latest]
+      - os: windows-latest
+        label: win-x64
+      - os: macos-13
+        label: macos-x64
+      - os: macos-14
+        label: macos-arm64
 
     steps:
       # -----------------------------
@@ -54,56 +59,5 @@ jobs:
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: Wright_Lab_Inventory-${{ matrix.os }}
+          name: Wright_Lab_Inventory-${{ matrix.label }}
           path: dist/Wright_Lab_Inventory/**
-
-  release:
-    needs: build   # wait until build finishes
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Checkout repo (with history so we can tag)
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0   # ✅ needed so we can create tags properly
-      # -----------------------------
-      # 1. Create a new tag automatically with datetime
-      # -----------------------------
-      - name: Create Tag
-        id: create_tag
-        run: |
-          TAG="v$(date +'%Y-%m-%d-%H%M%S')"
-          echo "TAG=$TAG" >> $GITHUB_ENV
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git tag $TAG
-          git push origin $TAG
-
-      # -----------------------------
-      # 2. Download build artifacts
-      # -----------------------------
-      - name: Download Windows build
-        uses: actions/download-artifact@v4
-        with:
-          name: Wright_Lab_Inventory-windows-latest
-          path: dist/windows
-
-      - name: Download macOS build
-        uses: actions/download-artifact@v4
-        with:
-          name: Wright_Lab_Inventory-macos-latest
-          path: dist/macos
-
-      # -----------------------------
-      # 3. Create GitHub Release
-      # -----------------------------
-      - name: Create Release
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: ${{ env.TAG }}
-          name: "Release ${{ env.TAG }}"
-          files: |
-            dist/windows/**
-            dist/macos/**
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -50,7 +50,13 @@ class DriveManager:
     download_file(file_id (str), output_path (str)) -> (bool, str | None):  
         Download a file from Google Drive by its file ID and save it locally at the given path.  
     upload_file(file_id (str), file_path (str)) -> (bool, str | None):  
-        Upload (update) a local file to an existing file on Google Drive, specified by its file ID.  
+        Upload (update) a local file to an existing file on Google Drive, specified by its file ID.
+    get_archive_dates(folder_id (str)) -> (list):
+        Retrieve all archived folder dates from a given parent folder in Google Drive.
+    make_archive_copies():
+        Creates copies of all the inventory files in a new folder.
+    auto_archive():
+        Automatically archives the inventory files if there is no archive within the half year.
     """
 
     # Full access to user's Google Drive

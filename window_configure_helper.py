@@ -7,6 +7,7 @@ from window_helper import ToplevelWindowHelper
 from picker_helper import PickerHelper
 import re
 from window_helper import ToplevelWindowHelper
+from natsort import natsorted
 
 class dataAddWindows:
     """
@@ -286,7 +287,9 @@ class dataAddWindows:
 
         # Append new rows to the DataFrame and re-sort for consistency.
         self.rows_df = pd.concat([self.rows_df, pd.DataFrame(new_rows)], ignore_index=True)
-        self.rows_df.sort_values(by=self.columns_to_sort_by, inplace=True) 
+        self.rows_df = self.rows_df.loc[
+            natsorted(self.rows_df.index, key=lambda i: self.rows_df.loc[i, self.columns_to_sort_by])
+        ]
 
         # Send the updated DataFrame back via callback (so parent GUI stays in sync).
         if self.add_callback:
@@ -378,7 +381,9 @@ class dataAddWindows:
 
         # Drop all matched rows at once and re-sort the DataFrame.
         self.rows_df.drop(index=matched_indices, inplace=True)
-        self.rows_df.sort_values(by=self.columns_to_sort_by, inplace=True)
+        self.rows_df = self.rows_df.loc[
+            natsorted(self.rows_df.index, key=lambda i: self.rows_df.loc[i, self.columns_to_sort_by])
+        ]
 
         # Send the updated DataFrame back via callback (so parent GUI stays in sync).
         if self.remove_callback:
