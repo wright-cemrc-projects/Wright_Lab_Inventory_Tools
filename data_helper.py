@@ -62,7 +62,7 @@ class DriveManager:
     # Full access to user's Google Drive
     SCOPES = ['https://www.googleapis.com/auth/drive']
 
-    def __init__(self, credentials_file='credentials.json', token_file='token.json'):
+    def __init__(self, credentials_file='credentials.json', token_file=os.path.join(app_context.working_directory, 'token.json')):
         """ Initialize the Google Drive client helper. See class docstring for parameter/attribute details."""
 
         self.credentials_file = credentials_file
@@ -285,11 +285,11 @@ class DriveManager:
             # Skip the main folder ID
             if name == "Inventories_Folder":
                 continue
-            # Create the file name
-            curr_path = f"{name}_{curr_date}.xlsx"
+
+            # Create the file name in a temporary directory.
+            curr_path = os.path.join(app_context.working_directory, f"{name}_{curr_date}.xlsx")
             self.download_file(file_id, curr_path)
-            # Mark the downloaded file for deletion on program close
-            app_context.temp_file_manager.mark_for_deletion(curr_path)
+
             # Upload file into the new archive folder
             self.upload_file(file_path=curr_path, parent_id=new_folder_id)
             
@@ -551,7 +551,7 @@ class IDManager:
 
         # Restart the program after updating
         def restart_program():
-            app_context.temp_file_manager.cleanup_temp_files()
+            # TODO: removed cleanup here; why restart in a program?
             python = sys.executable
             os.execv(python, [python] + sys.argv)
 

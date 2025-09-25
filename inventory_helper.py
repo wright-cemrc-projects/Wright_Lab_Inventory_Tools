@@ -236,9 +236,6 @@ class InventoryManagerBase:
             if not success:
                 self._handle_drive_error(error, self.row_id_key)
 
-            # Ensure this temp file is tracked for cleanup at exit         
-            app_context.temp_file_manager.mark_for_deletion(self.row_path)
-
             # Read Excel sheet into DataFrame
             self.rows_df = ExcelHelper.create_df(self.row_path, sheet_name=self.get_row_sheet_name())
             # Apply cleaning rules
@@ -252,9 +249,6 @@ class InventoryManagerBase:
             success, error = self.drive_tool.download_file(self.grid_ID, self.grid_path)
             if not success:
                 self._handle_drive_error(error, self.grid_id_key)
-
-            # Ensure this temp file is tracked for cleanup at exit
-            app_context.temp_file_manager.mark_for_deletion(self.grid_path)
 
     def get_row_sheet_name(self):
         """
@@ -319,20 +313,20 @@ class InventoryManagerBase:
         # Define the main menu buttons
         buttons = [
             ("View Current Inventory", self.click_view_inventory),
-            ("Add to Inventory", lambda: (app_context.temp_file_manager.notify_if_open_files(), windowManager.Configure_AddRemove_Window(
+            ("Add to Inventory", windowManager.Configure_AddRemove_Window(
                 required_fields=self.get_required_add_fields(),
                 top_label=self.get_add_top_label(),
                 adding=True,
                 unused_columns=self.get_unused_columns(),
                 window_name=self.get_add_window_name(),
-            ))),
-            ("Remove from Inventory", lambda: (app_context.temp_file_manager.notify_if_open_files(), windowManager.Configure_AddRemove_Window(
+            )),
+            ("Remove from Inventory", windowManager.Configure_AddRemove_Window(
                 required_fields=self.get_required_remove_fields(),
                 top_label=self.get_remove_top_label(),
                 adding=False,
                 unused_columns=self.get_unused_columns(),
                 window_name=self.get_remove_window_name(),
-            ))),
+            )),
         ]
 
         # Place buttons on the window in a grid layout
@@ -492,7 +486,6 @@ class InventoryManagerBase:
             command-line arguments (`sys.argv`).
             """
             
-            app_context.temp_file_manager.cleanup_temp_files()
             python = sys.executable
             os.execv(python, [python] + sys.argv)
 
@@ -727,7 +720,7 @@ class GridDewarManager(InventoryManagerBase):
 
         # Initialize logic from the InventoryManagerBase using the given row_path
         super().__init__(root, 
-            row_path="Grid_Dewar_Inventory.xlsx", 
+            row_path=os.path.join(app_context.working_directory, "Grid_Dewar_Inventory.xlsx"), 
             grid_path=None
             )
         # Key for row inventory lookup in the ID manager
@@ -909,8 +902,8 @@ class Freezer80Manager(InventoryManagerBase):
         # Initialize logic from the InventoryManagerBase using the given row_path and grid_path
         super().__init__(
             root,
-            row_path="-80_Inventory.xlsx",
-            grid_path="-80_Inventory.xlsx"
+            row_path=os.path.join(app_context.working_directory, "-80_Inventory.xlsx"),
+            grid_path=os.path.join(app_context.working_directory, "-80_Inventory.xlsx")
         )
         # Key for row inventory lookup in the ID manager
         self.row_id_key = "-80_Inventory"
@@ -1305,8 +1298,8 @@ class Freezer20Manager(InventoryManagerBase):
         # Initialize logic from the InventoryManagerBase using the given row_path and grid_path
         super().__init__(
             root,
-            row_path="-20_Inventory.xlsx",
-            grid_path="-20_Inventory.xlsx"
+            row_path=os.path.join(app_context.working_directory, "-20_Inventory.xlsx"),
+            grid_path=os.path.join(app_context.working_directory, "-20_Inventory.xlsx")
         )
         # Key for row inventory lookup in the ID manager
         self.row_id_key = "-20_Inventory"
@@ -1694,8 +1687,8 @@ class CellDewarManager(InventoryManagerBase):
         # Initialize logic from the InventoryManagerBase using the given row_path and grid_path
         super().__init__(
             root,
-            row_path="Cell_Culture_Inventory_Rows.xlsx",
-            grid_path="Cell_Culture_Inventory_Grid.xlsx"
+            row_path=os.path.join(app_context.working_directory, "Cell_Culture_Inventory_Rows.xlsx"),
+            grid_path=os.path.join(app_context.working_directory, "Cell_Culture_Inventory_Grid.xlsx")
         )
         # Key for row inventory lookup in the ID manager
         self.row_id_key = "Cell_Culture_Inventory_Rows"

@@ -109,8 +109,8 @@ class ToplevelWindowHelper:
     def _go_back(self):
         """Return to the previous window in history, if available."""
 
+        # TODO: disabled for now.
         # Give a warning message with "Retry" and "Cancel" options.
-        app_context.temp_file_manager.notify_if_open_files()
 
         #Save the position of the current window
         x, y = self.window.winfo_x(), self.window.winfo_y()

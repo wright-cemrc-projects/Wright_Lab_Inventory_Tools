@@ -4,6 +4,9 @@
 console_redirector = None
 console_history = []
 
+# Where to save files
+working_directory = '/tmp'
+
 # Managers to be assigned in main.py
-temp_file_manager = None
 id_manager = None
+
