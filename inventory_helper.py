@@ -831,6 +831,11 @@ class GridDewarManager(InventoryManagerBase):
         """Return the name of the 'Remove Entry' window."""
 
         return "Grid Dewar Box Removal"
+    
+    def get_unused_columns(self):
+        """Return column names that are ignored in the GUI."""
+
+        return ['Unnamed: 6']
 
 class Freezer80Manager(InventoryManagerBase):
     """
@@ -909,13 +914,13 @@ class Freezer80Manager(InventoryManagerBase):
         # Initialize logic from the InventoryManagerBase using the given row_path and grid_path
         super().__init__(
             root,
-            row_path="-80_Inventory.xlsx",
-            grid_path="-80_Inventory.xlsx"
+            row_path="80_Inventory.xlsx",
+            grid_path="80_Inventory.xlsx"
         )
         # Key for row inventory lookup in the ID manager
-        self.row_id_key = "-80_Inventory"
+        self.row_id_key = "80_Inventory"
         # Key for grid inventory lookup in the ID manager
-        self.grid_id_key = "-80_Inventory"
+        self.grid_id_key = "80_Inventory"
         # Get the unique ID for the row file from the ID manager
         self.row_ID = app_context.id_manager.get_id(self.row_id_key)
         # Get the unique ID for the grid file from the ID manager
@@ -1305,13 +1310,13 @@ class Freezer20Manager(InventoryManagerBase):
         # Initialize logic from the InventoryManagerBase using the given row_path and grid_path
         super().__init__(
             root,
-            row_path="-20_Inventory.xlsx",
-            grid_path="-20_Inventory.xlsx"
+            row_path="20_Inventory.xlsx",
+            grid_path="20_Inventory.xlsx"
         )
         # Key for row inventory lookup in the ID manager
-        self.row_id_key = "-20_Inventory"
+        self.row_id_key = "20_Inventory"
         # Key for grid inventory lookup in the ID manager
-        self.grid_id_key = "-20_Inventory"
+        self.grid_id_key = "20_Inventory"
         # Get the unique ID for the row file from the ID manager
         self.row_ID = app_context.id_manager.get_id(self.row_id_key)
         # Get the unique ID for the grid file from the ID manager
