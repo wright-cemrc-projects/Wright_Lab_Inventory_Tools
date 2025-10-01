@@ -222,6 +222,7 @@ class InventoryManagerBase:
         # Handle different error cases from DriveManager
         if error =="STALE_FILE_ERROR":
             messagebox.showerror("File Modified", "The file you are attempting to update has been modified since your download. You must restart the program and redo your action. Click 'OK' to restart the program")
+            self.restart_program()
         elif error == "MISSING_ID" or error == "NOT_FOUND":
             # Prompt user to update ID if file is missing
             app_context.id_manager.change_id_window(self.parent, id_key)
@@ -507,21 +508,8 @@ class InventoryManagerBase:
             justify="center")
         label.grid(row=0, column=0, padx=20, pady=(20, 10), sticky="n")
 
-        def restart_program():
-            """
-            Restart the entire program.
-
-            This cleans up any temporary files created during the session,
-            then re-executes the Python interpreter with the original
-            command-line arguments (`sys.argv`).
-            """
-            
-            app_context.temp_file_manager.cleanup_temp_files()
-            python = sys.executable
-            os.execv(python, [python] + sys.argv)
-
         # Create a button to let the user restart the program
-        button = tk.Button(saved_win, text="I have more to enter", command=restart_program, font=("Arial", 12))
+        button = tk.Button(saved_win, text="I have more to enter", command=self.restart_program, font=("Arial", 12))
         button.grid(row=1, column=0, padx=20, pady=(20, 10))
 
     # The following are getter methods for subclass override
