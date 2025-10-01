@@ -66,6 +66,8 @@ class InventoryManagerBase:
 
     Methods
     -------
+    restart_program():
+        Restarts the entire program and deletes temporary files.
     clean_dataframe(df (pd.DataFrame)) -> pd.DataFrame:  
         Return a cleaned copy of the DataFrame with normalized types and values.  
     load_data():  
@@ -139,6 +141,19 @@ class InventoryManagerBase:
         self.row_id_key = None
         self.grid_id_key = None
         self.rows_df = None
+
+    def restart_program():
+        """
+        Restart the entire program.
+
+        This cleans up any temporary files created during the session,
+        then re-executes the Python interpreter with the original
+        command-line arguments (`sys.argv`).
+        """
+        
+        app_context.temp_file_manager.cleanup_temp_files()
+        python = sys.executable
+        os.execv(python, [python] + sys.argv)
     
     def clean_dataframe(self, df):
         """Return a cleaned copy of the DataFrame.
@@ -206,7 +221,7 @@ class InventoryManagerBase:
     def _handle_drive_error(self, error, id_key):
         # Handle different error cases from DriveManager
         if error =="STALE_FILE_ERROR":
-            messagebox.showerror("The file you are attempting to update had been modified since your download. Please close the program and restart your action to continue.")
+            messagebox.showerror("File Modified", "The file you are attempting to update has been modified since your download. You must restart the program and redo your action. Click 'OK' to restart the program")
         elif error == "MISSING_ID" or error == "NOT_FOUND":
             # Prompt user to update ID if file is missing
             app_context.id_manager.change_id_window(self.parent, id_key)
