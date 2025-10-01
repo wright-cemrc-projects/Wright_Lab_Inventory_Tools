@@ -143,7 +143,7 @@ class DriveManager:
                 f.write(fh.getbuffer())
 
             print(f"✅ Download complete: {output_path}")
-            return True, None
+            return True, last_modified
         
         # Handle Google Drive API errors by status code
         except HttpError as e:
@@ -158,9 +158,10 @@ class DriveManager:
     def upload_file(self, file_path, download_alter_time, file_id=None, parent_id=None):
         """
         Upload a file to Google Drive.
+
         - If file_id is provided, updates the existing file.
         - If file_id is None, creates a new file. If parent_id is given,
-        uploads into that folder; otherwise uploads to My Drive.
+        - If the file has been modified since it was downloaded an error is returned
 
         :param file_path (str): Local path of the file to upload.
         :param file_id (str): (Optional) Google Drive file ID of an existing file.
@@ -169,6 +170,10 @@ class DriveManager:
             (True, file_id) on success
             (False, error_message) on failure.
         """
+
+        def parse_modified_time(time_str):
+            # Google Drive returns RFC 3339 (ISO 8601 style)
+            return datetime.strptime(time_str, "%Y-%m-%dT%H:%M:%S.%fZ")
 
         try:
             # Create a media upload object for the file to allow Google Drive API to read and upload
@@ -184,7 +189,7 @@ class DriveManager:
             ).execute()
 
             current_modified = metadata.get("modifiedTime")
-            if current_modified != download_alter_time:
+            if parse_modified_time(current_modified).replace(microsecond=0) != parse_modified_time(download_alter_time).replace(microsecond=0):
                 return False, "STALE_FILE_ERROR" 
 
             if file_id:
