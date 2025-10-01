@@ -142,7 +142,7 @@ class InventoryManagerBase:
         self.grid_id_key = None
         self.rows_df = None
 
-    def restart_program():
+    def restart_program(self):
         """
         Restart the entire program.
 
