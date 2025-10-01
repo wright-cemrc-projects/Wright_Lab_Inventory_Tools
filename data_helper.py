@@ -119,6 +119,13 @@ class DriveManager:
             # Create a request to download the file
             request = self.service.files().get_media(fileId=file_id)
 
+            metadata = self.service.files().get(
+                fileId=file_id,
+                fields="id, name, modifiedTime"
+            ).execute()
+
+            last_modified = metadata.get("modifiedTime")
+
             print(f"⏳ Downloading {output_path} from Google Drive... please wait.")
 
             # Use a memory buffer to hold the download
@@ -148,7 +155,7 @@ class DriveManager:
                 return False, f"HTTP_ERROR: {e}"  # Other errors
 
 
-    def upload_file(self, file_path, file_id=None, parent_id=None):
+    def upload_file(self, file_path, download_alter_time, file_id=None, parent_id=None):
         """
         Upload a file to Google Drive.
         - If file_id is provided, updates the existing file.
@@ -170,6 +177,15 @@ class DriveManager:
                 mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                 resumable=True
             )
+            # Before update
+            metadata = self.service.files().get(
+                fileId=file_id,
+                fields="id, modifiedTime"
+            ).execute()
+
+            current_modified = metadata.get("modifiedTime")
+            if current_modified != download_alter_time:
+                return False, "STALE_FILE_ERROR" 
 
             if file_id:
                 # Case 1: Update an existing file if a file_id is given

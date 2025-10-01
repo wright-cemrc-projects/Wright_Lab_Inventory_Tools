@@ -205,7 +205,9 @@ class InventoryManagerBase:
 
     def _handle_drive_error(self, error, id_key):
         # Handle different error cases from DriveManager
-        if error == "MISSING_ID" or error == "NOT_FOUND":
+        if error =="STALE_FILE_ERROR":
+            messagebox.showerror("The file you are attempting to update had been modified since your download. Please close the program and restart your action to continue.")
+        elif error == "MISSING_ID" or error == "NOT_FOUND":
             # Prompt user to update ID if file is missing
             app_context.id_manager.change_id_window(self.parent, id_key)
         elif error == "PERMISSION_DENIED":
@@ -224,6 +226,7 @@ class InventoryManagerBase:
         - Optionally loads a "grid" inventory file if IDs and paths are provided.
         - Handles Google Drive errors (missing ID, not found, permission issues).
         - Marks downloaded files for later deletion by the temp file manager.
+        - Saves a variable of when the files where last altered
         - Applies cleaning rules to the loaded DataFrame(s) by clean_dataframe().
         """
 
@@ -232,9 +235,12 @@ class InventoryManagerBase:
 
         # --- Step 1: Download and load row data ---
         if not (self.row_id_key == None):
-            success, error = self.drive_tool.download_file(self.row_ID, self.row_path)
+            success, info = self.drive_tool.download_file(self.row_ID, self.row_path)
             if not success:
-                self._handle_drive_error(error, self.row_id_key)
+                self._handle_drive_error(info, self.row_id_key)
+            if success:
+                # Store the last time the row file was altered on Google Drive
+                self.row_alter_time = info
 
             # Ensure this temp file is tracked for cleanup at exit         
             app_context.temp_file_manager.mark_for_deletion(self.row_path)
@@ -252,6 +258,9 @@ class InventoryManagerBase:
             success, error = self.drive_tool.download_file(self.grid_ID, self.grid_path)
             if not success:
                 self._handle_drive_error(error, self.grid_id_key)
+            if success:
+                # Store the last time the grid file was altered on Google Drive
+                self.grid_alter_time = info
 
             # Ensure this temp file is tracked for cleanup at exit
             app_context.temp_file_manager.mark_for_deletion(self.grid_path)
@@ -386,19 +395,19 @@ class InventoryManagerBase:
         self.update_grid_inventory()
 
         # Upload the updated row file to Google Drive
-        success, error = self.drive_tool.upload_file(file_path=self.row_path, file_id=self.row_ID)
+        success, info = self.drive_tool.upload_file(file_path=self.row_path, file_id=self.row_ID, download_alter_time=self.row_alter_time)
 
         # If upload fails, handle the error gracefully
         if not success:
-            self._handle_drive_error(error, self.row_id_key)
+            self._handle_drive_error(info, self.row_id_key)
         
         if self.grid_ID != self.row_ID:
             # Upload the updated grid file to Google Drive if different from row file
-            success, error = self.drive_tool.upload_file(file_path=self.grid_path, file_id=self.grid_ID)
+            success, info = self.drive_tool.upload_file(file_path=self.grid_path, file_id=self.grid_ID, download_alter_time=self.grid_alter_time)
 
             # If upload fails, handle the error gracefully
             if not success:
-                self._handle_drive_error(error, self.row_id_key)
+                self._handle_drive_error(info, self.row_id_key)
 
         # Show confirmation window that changes have been saved
         self.Changes_Saved_Window()
@@ -421,7 +430,7 @@ class InventoryManagerBase:
         self.update_grid_inventory()
 
                 # Upload the updated row file to Google Drive
-        success, error = self.drive_tool.upload_file(file_path=self.row_path, file_id=self.row_ID)
+        success, error = self.drive_tool.upload_file(file_path=self.row_path, file_id=self.row_ID, download_alter_time=self.row_alter_time)
 
         # If upload fails, handle the error gracefully
         if not success:
@@ -429,7 +438,7 @@ class InventoryManagerBase:
         
         if self.grid_ID != self.row_ID:
             # Upload the updated grid file to Google Drive if different from row file
-            success, error = self.drive_tool.upload_file(file_path=self.grid_path, file_id=self.grid_ID)
+            success, error = self.drive_tool.upload_file(file_path=self.grid_path, file_id=self.grid_ID, download_alter_time=self.grid_alter_time)
 
             # If upload fails, handle the error gracefully
             if not success:
@@ -805,7 +814,7 @@ class GridDewarManager(InventoryManagerBase):
     def get_required_add_fields(self):
         """Return the fields required to be enetered by the user when adding a new entry."""
 
-        return ["Cane Number", "Puck Number", "Slot Number", "Box Name", "Box Contents", "Date Frozen", "Person/Initials"]
+        return ["Cane Number", "Puck Number", "Slot Number", "Box Name", "Grid Numbers", "Box Contents", "Date Frozen", "Person/Initials", "Project", "Grid Type", "Blot Time", "Blot Force" "Drain Time"]
 
     def get_add_top_label(self):
         """Return the label shown at the top of the 'Add Entry' window."""
@@ -988,7 +997,7 @@ class Freezer80Manager(InventoryManagerBase):
     def get_required_add_fields(self):
         """Return the fields required to be enetered by the user when adding a new entry."""
 
-        return ["Shelf Number", "Rack Number", "Box Position", "Box Name", "Vial Position", "Vial Label", "Date Frozen", "Person/Initials", "Box Dimensions"]
+        return ["Shelf Number", "Rack Number", "Box Position", "Box Name", "Vial Position", "Vial Label", "Vial Contents", "Date Frozen", "Person/Initials", "Project", "Box Dimensions"]
 
     def get_add_top_label(self):
         """Return the label shown at the top of the 'Add Entry' window."""
@@ -1379,7 +1388,7 @@ class Freezer20Manager(InventoryManagerBase):
     def get_required_add_fields(self):
         """Return the fields required to be enetered by the user when adding a new entry."""
 
-        return ["Shelf Number", "Rack Number", "Box Position", "Box Name", "Person/Initials"]
+        return ["Shelf Number", "Rack Number", "Box Position", "Box Name", "Person/Initials", "Project/Group"]
 
     def get_add_top_label(self):
         """Return the label shown at the top of the 'Add Entry' window."""
@@ -1773,7 +1782,7 @@ class CellDewarManager(InventoryManagerBase):
     def get_required_add_fields(self):
         """Return the fields required to be enetered by the user when adding a new entry."""
 
-        return ["Rack Number", "Box Number", "Vial Position", "Vial Label", "Cell Type", "Passage Number", "Date Frozen", "Person/Initials"]
+        return ["Rack Number", "Box Number", "Vial Position", "Vial Label", "Cell Type", "Passage Number", "Date Frozen", "Person/Initials", "Project"]
 
     def get_add_top_label(self):
         """Return the label shown at the top of the 'Add Entry' window."""
